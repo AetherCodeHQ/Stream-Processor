@@ -1,37 +1,46 @@
-
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"net"
 	"os"
-	"strconv"
 	"strings"
-	"time"
 )
 
 func main() {
-	host := "127.0.0.1"
-	ports := []int{22, 80, 443, 8080}
+	mode := "passthrough"
 	if len(os.Args) > 1 {
-		host = os.Args[1]
+		mode = os.Args[1]
 	}
-	if len(os.Args) > 2 {
-		ports = ports[:0]
-		for _, q := range strings.Split(os.Args[2], ",") {
-			if n, err := strconv.Atoi(q); err == nil {
-				ports = append(ports, n)
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Buffer(make([]byte, 1<<20), 1<<20)
+	lines, fields, bytes := 0, 0, 0
+	var seen map[string]int
+	if mode == "unique" {
+		seen = map[string]int{}
+	}
+	for sc.Scan() {
+		line := sc.Text()
+		lines++
+		fields += len(strings.Fields(line))
+		bytes += len(line)
+		switch mode {
+		case "passthrough":
+			fmt.Println(line)
+		case "lower":
+			fmt.Println(strings.ToLower(line))
+		case "upper":
+			fmt.Println(strings.ToUpper(line))
+		case "unique":
+			if seen != nil {
+				seen[line]++
+				if seen[line] == 1 {
+					fmt.Println(line)
+				}
 			}
+		case "count":
+			// just count, don't output
 		}
 	}
-	for _, p := range ports {
-		addr := fmt.Sprintf("%s:%d", host, p)
-		c, err := net.DialTimeout("tcp", addr, 2*time.Second)
-		if err != nil {
-			fmt.Printf("%-24s closed\n", addr)
-			continue
-		}
-		fmt.Printf("%-24s open\n", addr)
-		c.Close()
-	}
+	fmt.Fprintf(os.Stderr, "stream: %d lines, %d fields, %d bytes\n", lines, fields, bytes)
 }
